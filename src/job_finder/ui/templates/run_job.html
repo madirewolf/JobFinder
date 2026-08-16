@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}{{ job.name }} · job · jfb{% endblock %}
+{% block main_class %}narrow{% endblock %}
+{% block body %}
+
+{% if job.status == 'running' %}
+  <meta http-equiv="refresh" content="2">
+{% endif %}
+
+<style>
+  .status-pill {
+    display: inline-block; padding: 2px 9px; border-radius: 999px;
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .status-pill.running { background: #0e1c2c; color: var(--accent); border: 1px solid #1f3553; }
+  .status-pill.done    { background: #11291c; color: var(--good); border: 1px solid #1e4833; }
+  .status-pill.error   { background: #2a1010; color: var(--bad); border: 1px solid #5a1c1c; }
+
+  .log {
+    background: #0a0d12; color: var(--ink-dim);
+    font-family: ui-monospace, SFMono-Regular, "Cascadia Mono", Menlo, Consolas, monospace;
+    font-size: 12px; line-height: 1.55;
+    padding: 12px 14px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    max-height: 60vh; overflow-y: auto;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .meta { color: var(--muted); font-size: 13px; margin-bottom: 14px; }
+  .err-box {
+    background: #2a1010; color: var(--bad);
+    border: 1px solid #5a1c1c; border-radius: var(--radius-sm);
+    padding: 10px 12px; margin: 10px 0;
+    font-family: ui-monospace, monospace; font-size: 12px;
+    white-space: pre-wrap;
+  }
+</style>
+
+<h1>{{ job.name }}</h1>
+<p class="meta">
+  <span class="status-pill {{ job.status }}">{{ job.status }}</span>
+  · {{ "%.1f"|format(job.elapsed_s) }}s elapsed
+  · ${{ "%.4f"|format(job.cost_so_far_usd) }} spent so far
+  {% if job.status == 'running' %}
+    · <span class="muted-2">page auto-refreshes every 2s</span>
+  {% endif %}
+</p>
+
+{% if job.error %}
+  <div class="err-box"><strong>Error:</strong> {{ job.error }}</div>
+{% endif %}
+
+<div class="card" style="padding: 0; overflow: hidden">
+  <div style="padding: 8px 12px; background: var(--panel-2); border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted)">
+    Live log
+  </div>
+  <div class="log">
+{% for line in job.log_lines -%}
+{{ line }}
+{% endfor %}
+  </div>
+</div>
+
+{% if job.extra %}
+  <div class="card" style="margin-top: 12px">
+    <div class="muted" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px">Result summary</div>
+    <ul class="bullets">
+      {% for k, v in job.extra.items() %}
+        <li><strong>{{ k }}:</strong> {{ v }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endif %}
+
+<div style="margin-top: 16px">
+  <a href="/run">← back to /run</a>
+  {% if job.status != 'running' %}
+    <span class="muted-2"> · </span>
+    <a href="/">→ home</a>
+  {% endif %}
+</div>
+
+{% endblock %}

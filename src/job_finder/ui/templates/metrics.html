@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}metrics · jfb{% endblock %}
+{% block main_class %}wide{% endblock %}
+{% block body %}
+
+<h1>Metrics</h1>
+<p class="page-sub">LLM spend and pipeline throughput.</p>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start">
+
+  <div>
+    <h2>Month-to-date LLM spend</h2>
+    <div class="card">
+      <div style="font-size: 36px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; line-height: 1.15">
+        ${{ "%.2f"|format(mtd_total_usd) }}
+      </div>
+      <div class="muted" style="font-size: 12px; margin-top: 4px">
+        across all operations this calendar month
+      </div>
+    </div>
+
+    <h2>By operation</h2>
+    <div class="card" style="padding: 0; overflow: hidden">
+      <table>
+        <thead>
+          <tr>
+            <th>operation</th>
+            <th>model</th>
+            <th class="num">USD</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in mtd_by_op %}
+            <tr>
+              <td><strong style="color: var(--ink-dim); font-weight: 500">{{ r.operation }}</strong></td>
+              <td class="muted mono" style="font-size: 12px">{{ r.model }}</td>
+              <td class="num mono-num">${{ "%.3f"|format(r.usd or 0) }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="3" class="muted">no LLM calls yet this month</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div>
+    <h2>Last 14 days</h2>
+    <div class="card" style="padding: 0; overflow: hidden">
+      <table>
+        <thead>
+          <tr>
+            <th>day</th>
+            <th>metric</th>
+            <th class="num">total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in per_day %}
+            <tr>
+              <td class="mono" style="font-size: 12px">{{ r.day.strftime("%Y-%m-%d") }}</td>
+              <td class="muted">{{ r.metric }}</td>
+              <td class="num mono-num">{{ "%.0f"|format(r.total) }}</td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="3" class="muted">
+                no metric events yet — run an ingestion pass
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="muted" style="font-size: 11px; margin-top: 10px">
+      Refresh: <code>REFRESH MATERIALIZED VIEW CONCURRENTLY v_daily_metrics;</code>
+    </p>
+  </div>
+
+</div>
+
+{% endblock %}

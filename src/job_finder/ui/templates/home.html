@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}home · jfb{% endblock %}
+{% block main_class %}narrow{% endblock %}
+{% block body %}
+
+<style>
+  .hero {
+    background: linear-gradient(180deg, var(--panel-2) 0%, var(--panel) 100%);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px;
+    margin-bottom: 18px;
+  }
+  .hero h1 { margin: 0 0 4px; font-size: 26px; }
+  .hero .sub { color: var(--muted); font-size: 14px; margin-bottom: 16px; }
+
+  .next-action {
+    background: var(--panel-2);
+    border: 1px solid var(--border-strong);
+    border-left: 4px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    margin-bottom: 18px;
+    display: flex; align-items: center; gap: 16px;
+  }
+  .next-action.kind-paid    { border-left-color: var(--warn); }
+  .next-action.kind-cheap   { border-left-color: var(--good); }
+  .next-action.kind-free    { border-left-color: var(--accent); }
+  .next-action .body { flex: 1; min-width: 0; }
+  .next-action h2 { margin: 0 0 4px; font-size: 16px; }
+  .next-action .sub { color: var(--muted); font-size: 13px; }
+  .next-action .cta { white-space: nowrap; }
+
+  .stat-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+    margin-bottom: 16px;
+  }
+  .stat {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 12px 14px;
+    text-align: left;
+  }
+  .stat .v { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
+
+  .map { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .map .card { padding: 16px; }
+  .map .card h3 { margin: 0 0 8px; font-size: 14px; }
+  .map .card p { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 0 0 8px; }
+  .map .card .links a { display: inline-block; margin-right: 10px; font-size: 13px; }
+</style>
+
+<div class="hero">
+  <h1>Job Finder Bot</h1>
+  <p class="sub">
+    A pipeline that pulls job postings, scores them against your profile, drafts a tailored cover letter and résumé per role, and lets you review before sending. The bot never submits anything for you — every external action is your click.
+  </p>
+</div>
+
+{# ── Single 'next action' CTA — pipeline-state aware ───────────────── #}
+<a href="{{ next_action.href }}" style="text-decoration: none; color: inherit; display: block">
+  <div class="next-action kind-{{ next_action.kind }}">
+    <div class="body">
+      <h2>{{ next_action.title }}</h2>
+      <div class="sub">{{ next_action.subtitle }}</div>
+    </div>
+    <span class="cta"><button>{{ next_action.cta }}</button></span>
+  </div>
+</a>
+
+{# ── Pipeline state ───────────────────────────────────────────────── #}
+<h2 style="margin: 20px 0 6px; font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em">Pipeline state</h2>
+<div class="stat-grid">
+  <div class="stat"><div class="v">{{ stats.ingested }}</div><div class="l">postings ingested</div></div>
+  <div class="stat"><div class="v">{{ stats.classified }}</div><div class="l">classified</div></div>
+  <div class="stat"><div class="v">{{ stats.queued }}</div><div class="l">queued for draft</div></div>
+  <div class="stat"><div class="v">{{ stats.ready_for_human }}</div><div class="l">draft ready to review</div></div>
+  <div class="stat"><div class="v">{{ stats.applied }}</div><div class="l">applied</div></div>
+  <div class="stat"><div class="v">{{ stats.drafted }}</div><div class="l">drafted (in flight)</div></div>
+  <div class="stat"><div class="v">{{ stats.skipped_low_fit }}</div><div class="l">skipped (low fit)</div></div>
+  <div class="stat"><div class="v">{{ stats.needs_classify }}</div><div class="l">awaiting score</div></div>
+</div>
+
+{# ── Where to go ──────────────────────────────────────────────────── #}
+<h2 style="margin: 20px 0 6px; font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em">Where to go</h2>
+<div class="map">
+  <div class="card">
+    <h3>📥 Run pipeline operations</h3>
+    <p>Pull new postings, score them, generate drafts. Cost-bearing actions ask for confirmation first.</p>
+    <div class="links"><a href="/run">Open /run →</a></div>
+  </div>
+  <div class="card">
+    <h3>🎯 Top picks</h3>
+    <p>Highest-fit postings, ranked. Click <strong>Queue (curate)</strong> on the ones you want drafted.</p>
+    <div class="links"><a href="/top">Open /top →</a></div>
+  </div>
+  <div class="card">
+    <h3>📋 Kanban board</h3>
+    <p>Every application by status (queued → drafted → applied → ...).</p>
+    <div class="links"><a href="/kanban">Open /kanban →</a></div>
+  </div>
+  <div class="card">
+    <h3>🏢 Companies</h3>
+    <p>Seeded targets, BG-check stringency, average fit per company.</p>
+    <div class="links"><a href="/companies">Open /companies →</a></div>
+  </div>
+  <div class="card">
+    <h3>📊 Metrics</h3>
+    <p>Pipeline throughput + month-to-date LLM spend.</p>
+    <div class="links"><a href="/metrics">Open /metrics →</a></div>
+  </div>
+  <div class="card">
+    <h3>📖 How to use</h3>
+    <p>Lifecycle, modes, and what each step costs.</p>
+    <div class="links"><a href="/about">Open /about →</a></div>
+  </div>
+</div>
+
+{% endblock %}

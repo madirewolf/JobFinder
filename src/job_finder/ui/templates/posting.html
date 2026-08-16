@@ -1,0 +1,503 @@
+{% extends "base.html" %}
+{% block title %}{{ p.title }} · {{ p.company }} · jfb{% endblock %}
+{% block main_class %}narrow{% endblock %}
+{% block body %}
+
+<p style="margin-bottom:4px">
+  <a href="/top" class="muted">← top picks</a>
+  <span class="muted-2"> · </span>
+  <a href="/" class="muted">kanban</a>
+  {% if p.application_id %}
+    <span class="muted-2"> · </span>
+    <span class="muted-2">application #{{ p.application_id }}</span>
+  {% endif %}
+</p>
+
+<h1>{{ p.title }}</h1>
+<p class="page-sub">
+  <strong style="color: var(--ink-dim); font-weight: 600">{{ p.company }}</strong>
+  {% if p.location %}<span class="muted-2"> · </span>{{ p.location }}{% endif %}
+  {% if p.remote_type %}<span class="muted-2"> · </span>{{ p.remote_type }}{% endif %}
+  {% if p.hq_city %}<span class="muted-2"> · </span>HQ {{ p.hq_city }}{% if p.hq_province %}, {{ p.hq_province }}{% endif %}{% endif %}
+  {% if p.url_canonical %}<span class="muted-2"> · </span><a href="{{ p.url_canonical }}" target="_blank" rel="noopener">source ↗</a>{% endif %}
+</p>
+
+{# ─────────────────────────────────────────────────────────────────────
+   Background-check warn surfacing (per prefs.md: warn, don't filter)
+   - lenient → no banner
+   - moderate → yellow banner
+   - strict / very_strict → red banner with reasoning
+   - unknown → yellow "stringency unknown" banner
+   ───────────────────────────────────────────────────────────────────── #}
+{% set bg = p.bg_stringency or 'unknown' %}
+{% if bg in ('strict', 'very_strict') %}
+  <div class="banner danger">
+    <span class="icon">⚠</span>
+    <div class="banner-stack">
+      <strong>Strict background check</strong>
+      <span class="reason">
+        {% if p.bg_check_reasoning %}{{ p.bg_check_reasoning }}{% else %}Likely fingerprint / criminal-record / credit check at offer stage. Apply with eyes open.{% endif %}
+      </span>
+    </div>
+  </div>
+{% elif bg == 'moderate' %}
+  <div class="banner warn">
+    <span class="icon">⚠</span>
+    <div class="banner-stack">
+      <strong>Moderate background check</strong>
+      <span class="reason">
+        {% if p.bg_check_reasoning %}{{ p.bg_check_reasoning }}{% else %}Standard reference / employment verification expected.{% endif %}
+      </span>
+    </div>
+  </div>
+{% elif bg == 'unknown' %}
+  <div class="banner warn">
+    <span class="icon">?</span>
+    <div class="banner-stack">
+      <strong>BG-check stringency unknown</strong>
+      <span class="reason">Treat as moderate until confirmed.</span>
+    </div>
+  </div>
+{% endif %}
+
+{# ─────────────────────────────────────────────────────────────────────
+   Application state banner
+   - applied → green
+   - ready_for_human / drafted → info (draft below, apply form below that)
+   - queued → blue, "next draft run picks this up"
+   - no application_id → call to action: Queue for draft
+   ───────────────────────────────────────────────────────────────────── #}
+{# Drafted-and-ready state: show action bar with re-queue + résumé-PDF affordances. #}
+{% if (p.application_status == 'ready_for_human' or p.application_status == 'drafted') and not p.applied_at %}
+  {% set preset = is_preset_mode(p.draft_mode) %}
+  <div class="banner info">
+    <div class="banner-stack" style="gap: 8px">
+      {% if preset %}
+        <strong>Preset résumé attached <span class="mode-pill-inline preset">{{ preset_label(p.draft_mode) }}</span></strong>
+        <span class="reason">
+          A pre-built pool résumé is attached — no AI, $0. Download the résumé and the cover letter (PDF),
+          fill the <code>[bracketed]</code> company/role spots in the letter, then paste into the company's form.
+          Pick a different pool below to swap; the previous draft is saved to <em>Previous drafts</em>.
+        </span>
+        <div style="display: flex; gap: 8px; align-items: center; margin-top: 6px; flex-wrap: wrap">
+          <a href="/posting/{{ p.id }}/resume.pdf" target="_blank" class="btn">📄 Download résumé (PDF)</a>
+          <a href="/posting/{{ p.id }}/cover-letter.pdf" target="_blank" class="btn ghost">✉ Download cover letter (PDF)</a>
+        </div>
+        <div style="display: flex; gap: 6px; align-items: center; margin-top: 6px; flex-wrap: wrap">
+          <span class="muted-2" style="font-size: 11px">Swap pool:</span>
+          {% for pr in presets %}
+            {% if pr.mode != p.draft_mode %}
+              <form method="post" action="/posting/{{ p.id }}/queue" style="display: inline">
+                <input type="hidden" name="mode" value="{{ pr.mode }}">
+                <button type="submit" class="ghost small">{{ pr.label }}</button>
+              </form>
+            {% endif %}
+          {% endfor %}
+        </div>
+      {% else %}
+        <strong>Draft ready for review <span class="mode-pill-inline {{ p.draft_mode }}">{{ p.draft_mode }}</span></strong>
+        <span class="reason">
+          Download the tailored résumé as PDF, then copy the cover letter / talking points below into the company's application form.
+          Re-queue to generate a fresh draft — the current one will be saved to <em>Previous drafts</em> below.
+        </span>
+        <div style="display: flex; gap: 8px; align-items: center; margin-top: 6px; flex-wrap: wrap">
+          <a href="/posting/{{ p.id }}/resume.pdf" target="_blank" class="btn">📄 Download tailored résumé (PDF)</a>
+          <form method="post" action="/posting/{{ p.id }}/queue" style="display: inline">
+            <input type="hidden" name="mode" value="{{ p.draft_mode }}">
+            <button type="submit" class="ghost small">↻ Re-queue ({{ p.draft_mode }})</button>
+          </form>
+          <form method="post" action="/posting/{{ p.id }}/queue" style="display: inline">
+            <input type="hidden" name="mode" value="{{ 'tailor' if p.draft_mode == 'curate' else 'curate' }}">
+            <button type="submit" class="ghost small">↻ Re-queue ({{ 'tailor' if p.draft_mode == 'curate' else 'curate' }})</button>
+          </form>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endif %}
+
+{% if p.applied_at %}
+  <div class="banner applied">
+    <span class="icon">✓</span>
+    <strong>Applied</strong>
+    <span class="muted">on {{ p.applied_at.strftime("%Y-%m-%d %H:%M") }}</span>
+  </div>
+{% elif p.application_status == 'queued' %}
+  <div class="banner queued">
+    <span class="icon">⧗</span>
+    <div class="banner-stack">
+      <strong>Queued for draft <span class="mode-pill-inline {{ p.draft_mode }}">{{ p.draft_mode }}</span></strong>
+      <span class="reason">
+        {% if p.draft_mode == 'curate' %}
+          Curate mode — the model will pick which projects to include and pull verbatim quotes from your master. It will NOT rewrite your bullets.
+        {% else %}
+          Tailor mode — the model will paraphrase your bullets to match the posting's terminology.
+        {% endif %}
+        Next <code>jfb draft top</code> run picks this up.
+      </span>
+      <form method="post" action="/posting/{{ p.id }}/queue" style="margin-top: 6px">
+        <span class="muted-2" style="font-size: 11px">Switch mode:</span>
+        {% if p.draft_mode == 'curate' %}
+          <button type="submit" name="mode" value="tailor" class="ghost small">→ tailor</button>
+        {% else %}
+          <button type="submit" name="mode" value="curate" class="ghost small">→ curate</button>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+{% elif p.application_status == 'dismissed' %}
+  <div class="banner warn">
+    <span class="icon">✕</span>
+    <div class="banner-stack">
+      <strong>Dismissed</strong>
+      <span class="reason">
+        You manually rejected this posting. It's hidden from <code>/top</code> by default.
+      </span>
+      <form method="post" action="/posting/{{ p.id }}/undismiss" style="margin-top: 6px">
+        <button type="submit" class="ghost small">↺ Un-dismiss (re-queue)</button>
+      </form>
+    </div>
+  </div>
+{% elif not p.application_id %}
+  <div class="banner info">
+    <div class="banner-stack" style="gap: 10px">
+      <strong>No draft yet</strong>
+      <span class="reason">
+        Two-gate flow: queue first → bot drafts → review → mark applied. The bot never drafts without a click.
+        Pick the mode you want for THIS posting:
+      </span>
+      <div style="display: flex; gap: 16px; align-items: flex-start; margin-top: 4px">
+        <form method="post" action="/posting/{{ p.id }}/queue">
+          <input type="hidden" name="mode" value="curate">
+          <button type="submit" {% if draft_mode_default == 'curate' %}{% else %}class="ghost"{% endif %}>Queue (curate)</button>
+          <div class="muted-2" style="font-size: 11px; margin-top: 4px; max-width: 220px">
+            Selection-only. Model picks which projects + pulls verbatim quotes. Master is never rewritten.
+          </div>
+        </form>
+        <form method="post" action="/posting/{{ p.id }}/queue">
+          <input type="hidden" name="mode" value="tailor">
+          <button type="submit" {% if draft_mode_default == 'tailor' %}{% else %}class="ghost"{% endif %}>Queue (tailor)</button>
+          <div class="muted-2" style="font-size: 11px; margin-top: 4px; max-width: 220px">
+            Paraphrase mode. Model rewrites your bullets to match the posting's language. Higher keyword match, higher fabrication risk.
+          </div>
+        </form>
+      </div>
+
+      {# ── Preset pool résumés: $0, no AI ─────────────────────────────── #}
+      <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border)">
+        <span class="reason" style="display: block; margin-bottom: 8px">
+          Or attach a <strong>preset pool résumé</strong> — instant, no AI, $0. Best when this job fits one of your standing pools.
+        </span>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap">
+          {% for pr in presets %}
+            <form method="post" action="/posting/{{ p.id }}/queue">
+              <input type="hidden" name="mode" value="{{ pr.mode }}">
+              <button type="submit" class="ghost small" title="{{ pr.blurb }}">📄 {{ pr.label }}</button>
+            </form>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border)">
+        <form method="post" action="/posting/{{ p.id }}/dismiss" style="display: inline-flex; gap: 6px; align-items: center"
+              onsubmit="return confirm('Dismiss this posting? It will be hidden from /top until you un-dismiss it.');">
+          <span class="muted-2" style="font-size: 12px">Not a fit?</span>
+          <input type="text" name="reason" placeholder="optional reason (geo lock, visa, etc.)"
+                 style="font-size: 12px; padding: 3px 8px; background: var(--panel-2); color: var(--ink); border: 1px solid var(--border); border-radius: var(--radius-sm); min-width: 220px">
+          <button type="submit" class="ghost small">✕ Dismiss</button>
+        </form>
+      </div>
+    </div>
+  </div>
+{% endif %}
+
+<!-- ── Scoring ─────────────────────────────────────────────────── -->
+<div class="card">
+  <div class="card-head">
+    <h3>Scoring</h3>
+    <span class="pill {{ p.bg_stringency or 'unknown' }}">bg · {{ p.bg_stringency or 'unknown' }}</span>
+  </div>
+  <dl class="kv">
+    <dt>final rank</dt>
+    <dd class="mono-num"><strong style="color: var(--accent)">{{ "%.3f"|format(p.final_rank or 0) }}</strong></dd>
+    <dt>fit score</dt>
+    <dd class="mono-num">{{ "%.3f"|format(p.fit_score or 0) }}</dd>
+    <dt>bg-check risk</dt>
+    <dd class="mono-num">{{ "%.3f"|format(p.check_risk_score or 0) }}</dd>
+    {% if p.salary_min or p.salary_max %}
+      <dt>salary</dt>
+      <dd class="mono-num">{{ p.salary_min or '?' }} – {{ p.salary_max or '?' }} {{ p.salary_currency or 'CAD' }}</dd>
+    {% endif %}
+    {% if p.tech_stack %}
+      <dt>stack</dt>
+      <dd class="muted">{{ p.tech_stack | join(", ") }}</dd>
+    {% endif %}
+    {% if p.bg_check_reasoning %}
+      <dt>bg reasoning</dt>
+      <dd class="muted">{{ p.bg_check_reasoning }}</dd>
+    {% endif %}
+  </dl>
+</div>
+
+{% if p.application_id %}
+
+  {% if p.cover_letter %}
+    <!-- ── Cover letter (both modes) ─────────────────────────────── -->
+    <div class="card copy-slot">
+      <button class="btn ghost small copy-btn" data-copy data-copy-target="#cover-letter-text">Copy</button>
+      <div class="card-head">
+        <h3>Cover letter</h3>
+        <span class="muted" style="font-size: 12px">
+          {% if p.draft_mode %}
+            {% if is_preset_mode(p.draft_mode) %}
+              <span class="mode-pill-inline preset">{{ preset_label(p.draft_mode) }}</span>
+            {% else %}
+              <span class="mode-pill-inline {{ p.draft_mode }}">{{ p.draft_mode }}</span>
+            {% endif %}
+          {% endif %}
+          {% if p.drafted_at %}drafted {{ p.drafted_at.strftime("%Y-%m-%d %H:%M") }}{% endif %}
+        </span>
+      </div>
+      <pre id="cover-letter-text" class="prose">{{ p.cover_letter }}</pre>
+    </div>
+  {% endif %}
+
+  {# ── TAILOR MODE: paraphrased bullets (LLM-written) ─────────── #}
+  {% if p.draft_mode == 'tailor' and p.tailored_bullets %}
+    <div class="card copy-slot">
+      <button class="btn ghost small copy-btn" data-copy data-copy-target="#bullets-copy">Copy</button>
+      <div class="card-head">
+        <h3>Tailored résumé bullets <span class="muted-2" style="font-size: 11px; font-weight: 400">· LLM-paraphrased</span></h3>
+        <span class="muted" style="font-size: 12px">{{ p.tailored_bullets | length }} bullets</span>
+      </div>
+      <ul class="bullets">
+        {% for b in p.tailored_bullets %}
+          <li><span class="section-tag">{{ b.section }}</span>{{ b.bullet }}</li>
+        {% endfor %}
+      </ul>
+      <pre id="bullets-copy" hidden>{% for b in p.tailored_bullets %}[{{ b.section | upper }}] {{ b.bullet }}
+{% endfor %}</pre>
+    </div>
+  {% endif %}
+
+  {# ── CURATE MODE: selection + verbatim emphasis quotes ─────── #}
+  {% if p.draft_mode == 'curate' and p.curate_payload %}
+    {% set cp = p.curate_payload %}
+
+    <!-- Sections to include / drop on the tailored résumé -->
+    <div class="card">
+      <div class="card-head">
+        <h3>Tailored résumé selection</h3>
+        <span class="muted" style="font-size: 12px">model picks; you decide</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px">
+        <div>
+          <div class="muted" style="font-size: 11px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em">
+            Include · {{ (cp.selected_projects or []) | length }}
+          </div>
+          {% for slug in cp.selected_projects or [] %}
+            <span class="status-chip ready_for_human" style="margin: 2px">{{ slug }}</span>
+          {% endfor %}
+        </div>
+        <div>
+          <div class="muted" style="font-size: 11px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em">
+            Drop · {{ (cp.dropped_projects or []) | length }}
+          </div>
+          {% for slug in cp.dropped_projects or [] %}
+            <span class="status-chip" style="margin: 2px; opacity: 0.6">{{ slug }}</span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Verbatim emphasis quotes -->
+    {% if cp.emphasis_quotes %}
+      <div class="card copy-slot">
+        <button class="btn ghost small copy-btn" data-copy data-copy-target="#emphasis-copy">Copy all</button>
+        <div class="card-head">
+          <h3>Emphasis quotes <span class="muted-2" style="font-size: 11px; font-weight: 400">· verbatim from your master</span></h3>
+          <span class="muted" style="font-size: 12px">{{ cp.emphasis_quotes | length }} quotes</span>
+        </div>
+        <ul class="bullets">
+          {% for q in cp.emphasis_quotes %}
+            <li>
+              <span class="section-tag">{{ q.source }}</span>
+              {{ q.quote }}
+            </li>
+          {% endfor %}
+        </ul>
+        <pre id="emphasis-copy" hidden>{% for q in cp.emphasis_quotes %}[{{ q.source }}] {{ q.quote }}
+{% endfor %}</pre>
+      </div>
+    {% endif %}
+
+    <!-- LLM-written suggestions, clearly labelled -->
+    {% if cp.suggested_phrasings %}
+      <div class="card">
+        <div class="card-head">
+          <h3 class="warn">⚠ Suggested phrasings <span class="muted-2" style="font-size: 11px; font-weight: 400">· LLM-written, REVIEW BEFORE USING</span></h3>
+          <span class="muted" style="font-size: 12px">{{ cp.suggested_phrasings | length }} suggestion(s)</span>
+        </div>
+        <p class="muted" style="font-size: 12px; margin-bottom: 10px">
+          These are <em>not</em> on your résumé. The model proposes them as possible additions or rewrites you might consider editing into your master. They are clearly fabricated until you accept and edit them in.
+        </p>
+        <ul class="bullets">
+          {% for s in cp.suggested_phrasings %}
+            <li>
+              <div class="muted-2" style="font-size: 11px">{{ s.rationale }}</div>
+              <div>{{ s.suggestion }}</div>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+  {% endif %}
+
+  {# ── Talking points (both modes) ───────────────────────────── #}
+  {% if p.talking_points %}
+    <div class="card copy-slot">
+      <button class="btn ghost small copy-btn" data-copy data-copy-target="#talking-points-copy">Copy</button>
+      <div class="card-head"><h3>Talking points</h3></div>
+      <ul class="bullets">
+        {% for tp in p.talking_points %}<li>{{ tp }}</li>{% endfor %}
+      </ul>
+      <pre id="talking-points-copy" hidden>{% for tp in p.talking_points %}- {{ tp }}
+{% endfor %}</pre>
+    </div>
+  {% endif %}
+
+  {# ── Red flags (both modes) ────────────────────────────────── #}
+  {% if p.red_flags %}
+    <div class="card">
+      <div class="card-head"><h3>⚠ Red flags</h3></div>
+      <ul class="bullets">
+        {% for rf in p.red_flags %}<li class="danger">{{ rf }}</li>{% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  {# ── Previous drafts (history; collapsed by default) ────── #}
+  {% if p.draft_history and p.draft_history|length > 0 %}
+    <details class="card" style="padding: 0">
+      <summary style="padding: 12px 16px; cursor: pointer; user-select: none; font-weight: 600">
+        Previous drafts
+        <span class="muted-2" style="font-weight: 400; margin-left: 6px; font-size: 12px">
+          {{ p.draft_history|length }} prior draft{{ 's' if p.draft_history|length != 1 else '' }} saved
+        </span>
+      </summary>
+      <div style="padding: 0 16px 16px 16px">
+        {% for h in p.draft_history %}
+          <div style="border-top: 1px solid var(--border); padding: 14px 0">
+            <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px">
+              <strong>#{{ loop.index }}</strong>
+              <span class="mode-pill-inline {{ h.draft_mode }}">{{ h.draft_mode or 'unknown' }}</span>
+              <span class="muted" style="font-size: 12px">
+                {% if h.drafted_at %}drafted {{ h.drafted_at }}{% endif %}
+              </span>
+            </div>
+
+            {% if h.cover_letter %}
+              <details style="margin: 6px 0">
+                <summary class="muted" style="cursor: pointer; font-size: 12px">Cover letter ({{ h.cover_letter|length }}c)</summary>
+                <pre class="prose" style="margin-top: 6px; font-size: 13px">{{ h.cover_letter }}</pre>
+              </details>
+            {% endif %}
+
+            {% if h.tailored_bullets %}
+              <details style="margin: 6px 0">
+                <summary class="muted" style="cursor: pointer; font-size: 12px">Tailored bullets ({{ h.tailored_bullets|length }})</summary>
+                <ul class="bullets" style="margin-top: 6px">
+                  {% for b in h.tailored_bullets %}
+                    <li><span class="section-tag">{{ b.section }}</span>{{ b.bullet }}</li>
+                  {% endfor %}
+                </ul>
+              </details>
+            {% endif %}
+
+            {% if h.curate_payload %}
+              <details style="margin: 6px 0">
+                <summary class="muted" style="cursor: pointer; font-size: 12px">
+                  Curate payload
+                  ({{ (h.curate_payload.selected_projects or [])|length }} selected,
+                  {{ (h.curate_payload.emphasis_quotes or [])|length }} quotes,
+                  {{ (h.curate_payload.suggested_phrasings or [])|length }} suggestions)
+                </summary>
+                <div style="margin-top: 6px; font-size: 13px">
+                  <div class="muted-2" style="font-size: 11px; margin-bottom: 4px">Selected:</div>
+                  {% for s in h.curate_payload.selected_projects or [] %}
+                    <span class="status-chip ready_for_human" style="margin: 2px">{{ s }}</span>
+                  {% endfor %}
+                  {% if h.curate_payload.emphasis_quotes %}
+                    <div class="muted-2" style="font-size: 11px; margin: 8px 0 4px">Emphasis quotes:</div>
+                    <ul class="bullets">
+                      {% for q in h.curate_payload.emphasis_quotes %}
+                        <li><span class="section-tag">{{ q.source }}</span>{{ q.quote }}</li>
+                      {% endfor %}
+                    </ul>
+                  {% endif %}
+                </div>
+              </details>
+            {% endif %}
+
+            {% if h.talking_points or h.red_flags %}
+              <details style="margin: 6px 0">
+                <summary class="muted" style="cursor: pointer; font-size: 12px">
+                  Talking points + red flags
+                </summary>
+                <div style="margin-top: 6px; font-size: 13px">
+                  {% if h.talking_points %}
+                    <div class="muted-2" style="font-size: 11px; margin-bottom: 4px">Talking points:</div>
+                    <ul class="bullets">{% for tp in h.talking_points %}<li>{{ tp }}</li>{% endfor %}</ul>
+                  {% endif %}
+                  {% if h.red_flags %}
+                    <div class="muted-2" style="font-size: 11px; margin: 8px 0 4px">Red flags:</div>
+                    <ul class="bullets">{% for rf in h.red_flags %}<li class="danger">{{ rf }}</li>{% endfor %}</ul>
+                  {% endif %}
+                </div>
+              </details>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    </details>
+  {% endif %}
+
+{% endif %}
+
+<!-- ── Human-confirmation gate ───────────────────────────────────── -->
+{% if not p.applied_at %}
+  <div class="card">
+    <div class="card-head"><h3>After you submit</h3></div>
+    <p class="muted" style="margin-bottom: 12px">
+      The only place that marks this application as submitted. Click after you've actually
+      pasted into the external form — the bot never submits on your behalf.
+    </p>
+    <form method="post" action="/posting/{{ p.id }}/apply">
+      <label for="notes">Notes (optional)</label>
+      <textarea
+        name="notes"
+        id="notes"
+        rows="2"
+        placeholder="e.g. went via referral, tweaked bullet #2, salary not disclosed"
+      ></textarea>
+      <div style="margin-top: 14px">
+        <button type="submit" class="primary-lg">✓ Mark as applied</button>
+      </div>
+    </form>
+  </div>
+{% endif %}
+
+<!-- ── Job description ──────────────────────────────────────────── -->
+{% if p.description_text %}
+  <div class="card">
+    <div class="card-head">
+      <h3>Job description</h3>
+      <span class="muted" style="font-size: 12px">
+        {{ (p.description_text | length / 1000) | round(1) }}k chars
+      </span>
+    </div>
+    <pre class="prose" style="max-height: 480px; overflow-y: auto">{{ p.description_text | truncate(8000) }}</pre>
+  </div>
+{% endif %}
+
+{% endblock %}

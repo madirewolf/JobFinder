@@ -1,0 +1,50 @@
+# Example systemd timer + service pair for the nightly drafter batch.
+#
+# Runs `jfb draft top --limit 15` once a day at ~02:10 local time. A single
+# cached system prefix across the batch brings per-posting cost down to
+# roughly the Sonnet cache-read rate (0.1× input); with 15 postings and a
+# ~40k-token system block, a run typically sits around $0.05–0.15 USD.
+#
+# Install:
+#   sudo cp jfb-draft.service /etc/systemd/system/
+#   sudo cp jfb-draft.timer   /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now jfb-draft.timer
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# /etc/systemd/system/jfb-draft.service
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# [Unit]
+# Description=Job Finder Bot — nightly drafter (Sonnet + RAG)
+# After=network-online.target
+# Wants=network-online.target
+#
+# [Service]
+# Type=oneshot
+# User=YOUR_USER
+# WorkingDirectory=/home/YOUR_USER/job-finder-bot
+# Environment=PATH=/home/YOUR_USER/.local/bin:/usr/local/bin:/usr/bin
+# EnvironmentFile=/home/YOUR_USER/job-finder-bot/.env
+# ExecStart=/home/YOUR_USER/.local/bin/uv run jfb draft top --limit 15
+# StandardOutput=journal
+# StandardError=journal
+#
+# # Hard dollar ceiling per invocation. See SPEC §0: bot drafts, human submits.
+# # We never want a prompt-cache miss to blow up overnight costs silently.
+# MemoryMax=1G
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# /etc/systemd/system/jfb-draft.timer
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# [Unit]
+# Description=Draft tailored applications once per day (pre-digest)
+#
+# [Timer]
+# OnCalendar=*-*-* 02:10:00   # run before the 07:00 digest
+# RandomizedDelaySec=10min
+# Persistent=true
+#
+# [Install]
+# WantedBy=timers.target

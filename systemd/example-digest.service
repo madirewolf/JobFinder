@@ -1,0 +1,49 @@
+# Example systemd timer + service pair for the 07:00 daily digest email.
+#
+# Runs `jfb digest send` once per day. Shows top-15 new postings from the
+# prior 24h, yesterday's applied-by-human entries, follow-ups due (>=7d),
+# and month-to-date LLM spend. Needs RESEND_API_KEY and RESEND_TO set.
+#
+# Install:
+#   sudo cp jfb-digest.service /etc/systemd/system/
+#   sudo cp jfb-digest.timer   /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now jfb-digest.timer
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# /etc/systemd/system/jfb-digest.service
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# [Unit]
+# Description=Job Finder Bot — daily digest (Resend)
+# After=network-online.target jfb-draft.service
+# Wants=network-online.target
+#
+# [Service]
+# Type=oneshot
+# User=YOUR_USER
+# WorkingDirectory=/home/YOUR_USER/job-finder-bot
+# Environment=PATH=/home/YOUR_USER/.local/bin:/usr/local/bin:/usr/bin
+# EnvironmentFile=/home/YOUR_USER/job-finder-bot/.env
+# ExecStart=/home/YOUR_USER/.local/bin/uv run jfb digest send
+# StandardOutput=journal
+# StandardError=journal
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# /etc/systemd/system/jfb-digest.timer
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# [Unit]
+# Description=Send daily job-search digest at 07:00
+#
+# [Timer]
+# OnCalendar=*-*-* 07:00:00
+# RandomizedDelaySec=2min
+# Persistent=true     # catch up if the laptop was sleeping at 07:00
+#
+# [Install]
+# WantedBy=timers.target
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# Sanity check before wiring up the timer:
+#   uv run jfb digest preview   # prints plaintext, no email sent

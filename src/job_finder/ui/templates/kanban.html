@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}kanban · jfb{% endblock %}
+{% block main_class %}wide{% endblock %}
+{% block body %}
+
+<h1>Application pipeline</h1>
+<p class="page-sub">Drafts flow left-to-right. Cards are ordered by final rank. Click a card to open the detail page.</p>
+
+{% set queued_count = grouped.get('queued', []) | length %}
+{% if queued_count > 0 %}
+  <div class="banner info" style="margin-bottom: 14px">
+    <span class="icon">📝</span>
+    <div class="banner-stack">
+      <strong>{{ queued_count }} posting(s) queued for drafting</strong>
+      <span class="reason">
+        Click below to run the fit-gate (Haiku, cheap) + curation (Sonnet, ~$0.05 per posting that passes the gate).
+        Estimated max spend: <strong>${{ "%.2f"|format(queued_count * 0.06) }}</strong>.
+      </span>
+      <a href="/run/draft" style="margin-top: 6px"><button>Generate drafts now →</button></a>
+    </div>
+  </div>
+{% endif %}
+
+<style>
+  .board {
+    display: grid;
+    grid-template-columns: repeat({{ columns|length }}, minmax(210px, 1fr));
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .col-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    padding: 4px 10px 8px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .col-head h2 {
+    margin: 0; font-size: 11px; letter-spacing: 0.08em;
+  }
+  .col-head .count {
+    background: var(--panel-2); color: var(--muted);
+    font-size: 10px; font-weight: 500;
+    padding: 2px 8px; border-radius: 999px;
+    border: 1px solid var(--border);
+    font-variant-numeric: tabular-nums;
+  }
+  .job-card {
+    display: block;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    color: inherit;
+    text-decoration: none;
+    transition: background 80ms, border-color 80ms, transform 80ms;
+  }
+  .job-card:hover {
+    background: var(--panel-hover);
+    border-color: var(--border-strong);
+    text-decoration: none;
+    transform: translateY(-1px);
+  }
+  .job-card .rank {
+    float: right;
+    font-size: 11px; font-weight: 700;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    margin-left: 6px;
+  }
+  .job-card .title {
+    font-weight: 500; color: var(--ink);
+    font-size: 13px; line-height: 1.35;
+    margin-bottom: 3px;
+  }
+  .job-card .company {
+    color: var(--muted); font-size: 12px;
+    margin-bottom: 8px;
+  }
+  .job-card .meta {
+    display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+    font-size: 10px;
+  }
+  .col-empty {
+    color: var(--muted-2); font-size: 12px;
+    padding: 8px 10px; font-style: italic;
+    text-align: center;
+    border: 1px dashed var(--border); border-radius: var(--radius);
+  }
+</style>
+
+{% set label_map = {
+  "queued": "Queued",
+  "drafted": "Drafted",
+  "ready_for_human": "Ready for review",
+  "applied": "Applied",
+  "acknowledged": "Acknowledged",
+  "phone": "Phone screen",
+  "onsite": "Onsite",
+  "offer": "Offer",
+  "rejected": "Rejected",
+} %}
+
+<div class="board">
+  {% for col in columns %}
+    {% set rows = grouped.get(col, []) %}
+    <div class="col">
+      <div class="col-head">
+        <h2>{{ label_map.get(col, col) }}</h2>
+        <span class="count">{{ rows|length }}</span>
+      </div>
+      {% for r in rows %}
+        <a class="job-card" href="/posting/{{ r.posting_id }}">
+          {% if r.final_rank is not none %}
+            <span class="rank">{{ "%.2f"|format(r.final_rank) }}</span>
+          {% endif %}
+          <div class="title">{{ r.title | truncate(60) }}</div>
+          <div class="company">
+            {{ r.company }}
+            {% if r.hq_city %}<span class="muted-2">· {{ r.hq_city }}</span>{% endif %}
+          </div>
+          <div class="meta">
+            {% set bg = r.bg_stringency or 'unknown' %}
+            <span class="pill {{ bg }} bg-warn" title="{% if bg in ('strict','very_strict') %}Strict — apply with eyes open{% elif bg == 'moderate' %}Moderate{% elif bg == 'unknown' %}Stringency unknown — treat as moderate{% else %}Lenient{% endif %}">
+              {% if bg in ('strict','very_strict') %}<span class="icon">⚠</span>{% elif bg == 'moderate' or bg == 'unknown' %}<span class="icon">!</span>{% endif %}
+              {{ bg }}
+            </span>
+            {% if r.fit_score is not none %}<span class="muted mono-num">fit {{ "%.2f"|format(r.fit_score) }}</span>{% endif %}
+          </div>
+        </a>
+      {% else %}
+        <div class="col-empty">—</div>
+      {% endfor %}
+    </div>
+  {% endfor %}
+</div>
+
+{% endblock %}

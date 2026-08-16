@@ -1,0 +1,55 @@
+# Example systemd timer + service pair for hourly Greenhouse ingestion.
+#
+# Install:
+#   sudo cp jfb-ingest-greenhouse.service /etc/systemd/system/
+#   sudo cp jfb-ingest-greenhouse.timer   /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now jfb-ingest-greenhouse.timer
+#
+# Inspect:
+#   systemctl list-timers --all | grep jfb
+#   journalctl -u jfb-ingest-greenhouse.service -f
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# /etc/systemd/system/jfb-ingest-greenhouse.service
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# [Unit]
+# Description=Job Finder Bot — Greenhouse ingestion
+# After=network-online.target
+# Wants=network-online.target
+#
+# [Service]
+# Type=oneshot
+# User=YOUR_USER
+# WorkingDirectory=/home/YOUR_USER/job-finder-bot
+# Environment=PATH=/home/YOUR_USER/.local/bin:/usr/local/bin:/usr/bin
+# ExecStart=/home/YOUR_USER/.local/bin/uv run jfb ingest source --source greenhouse
+# StandardOutput=journal
+# StandardError=journal
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# /etc/systemd/system/jfb-ingest-greenhouse.timer
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# [Unit]
+# Description=Run Greenhouse ingestion hourly
+#
+# [Timer]
+# OnBootSec=5min
+# OnUnitActiveSec=1h
+# RandomizedDelaySec=5min      # spread load; avoid synchronized polling
+# Persistent=true               # run once if system was off at trigger time
+#
+# [Install]
+# WantedBy=timers.target
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# Cadences per SPEC §3:
+#   greenhouse, lever, ashby, smartrecruiters, eightfold : 1h
+#   workable, recruitee                                   : 4h
+#   workday                                               : 2–4h
+#   hn                                                    : monthly (0 0 1 * *)
+#
+# macOS users: use launchd plists under ~/Library/LaunchAgents instead; the
+# StartInterval key replaces OnUnitActiveSec.

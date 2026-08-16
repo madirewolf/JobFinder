@@ -1,0 +1,58 @@
+# Example systemd timer + service pair for the full classify pipeline.
+#
+# Runs `jfb classify all` (regex → embed → haiku → rank) every 2h. The
+# Haiku call is batched 10/posting, so this is cheap even on a busy day.
+#
+# Install:
+#   sudo cp jfb-classify.service /etc/systemd/system/
+#   sudo cp jfb-classify.timer   /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now jfb-classify.timer
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# /etc/systemd/system/jfb-classify.service
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# [Unit]
+# Description=Job Finder Bot — classify (regex + embed + haiku + rank)
+# After=network-online.target ollama.service
+# Wants=network-online.target
+#
+# [Service]
+# Type=oneshot
+# User=YOUR_USER
+# WorkingDirectory=/home/YOUR_USER/job-finder-bot
+# Environment=PATH=/home/YOUR_USER/.local/bin:/usr/local/bin:/usr/bin
+# EnvironmentFile=/home/YOUR_USER/job-finder-bot/.env
+# ExecStart=/home/YOUR_USER/.local/bin/uv run jfb classify all
+# StandardOutput=journal
+# StandardError=journal
+# Nice=10
+#
+# # Guardrails: Haiku's batch size × max_batches caps cost, but a runaway
+# # loop would still be unpleasant. Budget the process.
+# MemoryMax=1G
+# CPUQuota=80%
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# /etc/systemd/system/jfb-classify.timer
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# [Unit]
+# Description=Run classify pipeline every 2 hours
+#
+# [Timer]
+# OnBootSec=10min
+# OnUnitActiveSec=2h
+# RandomizedDelaySec=5min
+# Persistent=true
+#
+# [Install]
+# WantedBy=timers.target
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# Notes:
+#   • Needs the Ollama daemon (used for local embeddings). If Ollama runs
+#     as a systemd unit itself, the After= above orders us behind it.
+#   • EnvironmentFile should hold ANTHROPIC_API_KEY, DATABASE_URL, etc.
+#   • Check `journalctl -u jfb-classify.service -f` after the first run.

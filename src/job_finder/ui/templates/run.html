@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}run · jfb{% endblock %}
+{% block main_class %}narrow{% endblock %}
+{% block body %}
+
+<style>
+  .actions { display: flex; flex-direction: column; gap: 12px; }
+  .action {
+    display: flex; align-items: flex-start; gap: 16px;
+    padding: 16px 18px;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .action.bucket-free  { border-left: 4px solid var(--accent); }
+  .action.bucket-cheap { border-left: 4px solid var(--good); }
+  .action.bucket-paid  { border-left: 4px solid var(--warn); }
+  .action .body { flex: 1; min-width: 0; }
+  .action h3 { margin: 0 0 4px; font-size: 15px; }
+  .action .desc { color: var(--muted); font-size: 13px; margin-bottom: 6px; }
+  .action .cost { font-size: 12px; font-weight: 600; }
+  .action .cost.bucket-free  { color: var(--accent); }
+  .action .cost.bucket-cheap { color: var(--good); }
+  .action .cost.bucket-paid  { color: var(--warn); }
+  .action .go { white-space: nowrap; }
+
+  .running-card {
+    background: #0e1c2c;
+    border: 1px solid #1f3553;
+    border-left: 4px solid var(--accent);
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    margin-bottom: 12px;
+  }
+  .recent { font-size: 12px; }
+  .recent th, .recent td { padding: 6px 8px; }
+  .recent .ok    { color: var(--good); }
+  .recent .err   { color: var(--bad); }
+</style>
+
+<h1>Run</h1>
+<p class="page-sub">
+  Every pipeline step you'd otherwise run from the terminal. Cost-bearing
+  actions show a confirmation page before they fire — nothing here spends
+  money without a second click.
+</p>
+
+{% if running_jobs %}
+  <h2>In flight</h2>
+  {% for j in running_jobs %}
+    <div class="running-card">
+      <strong>{{ j.name }}</strong>
+      <span class="muted">· running for {{ "%.1f"|format(j.elapsed_s) }}s · ${{ "%.4f"|format(j.cost_so_far_usd) }}</span>
+      <div style="margin-top: 4px"><a href="/run/job/{{ j.id }}">→ open status</a></div>
+    </div>
+  {% endfor %}
+{% endif %}
+
+<h2>Available actions</h2>
+<div class="actions">
+  {% for ax in actions %}
+    {% if ax.requires_confirm %}
+      {% set href = "/run/" ~ ax.slug %}
+      {% set is_form = false %}
+    {% else %}
+      {% set href = "/run/" ~ ax.slug %}
+      {% set is_form = true %}
+    {% endif %}
+    <div class="action bucket-{{ ax.cost_bucket }}">
+      <div class="body">
+        <h3>{{ ax.title }}</h3>
+        <div class="desc">{{ ax.description }}</div>
+        <span class="cost bucket-{{ ax.cost_bucket }}">Cost: {{ ax.cost_label }}</span>
+      </div>
+      <span class="go">
+        {% if is_form %}
+          {# Free actions run immediately on submit — no confirmation page. #}
+          <form method="post" action="/run/{{ ax.slug }}" style="margin: 0">
+            <button type="submit">Run →</button>
+          </form>
+        {% else %}
+          <a href="/run/{{ ax.slug }}"><button>Run →</button></a>
+        {% endif %}
+      </span>
+    </div>
+  {% endfor %}
+</div>
+
+{% if recent_jobs %}
+  <h2>Recent runs</h2>
+  <div class="card" style="padding: 0; overflow: hidden">
+    <table class="recent">
+      <thead>
+        <tr><th>action</th><th>status</th><th class="num">elapsed</th><th class="num">cost</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for j in recent_jobs %}
+          <tr>
+            <td>{{ j.name }}</td>
+            <td class="{{ 'ok' if j.status == 'done' else 'err' if j.status == 'error' else '' }}">
+              {{ j.status }}
+            </td>
+            <td class="num mono-num">{{ "%.1f"|format(j.elapsed_s) }}s</td>
+            <td class="num mono-num">${{ "%.4f"|format(j.cost_so_far_usd) }}</td>
+            <td><a href="/run/job/{{ j.id }}">open</a></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+
+{% endblock %}

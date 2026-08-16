@@ -1,0 +1,47 @@
+# Example systemd timer + service pair for monthly portfolio-site ingest.
+#
+# Re-crawls limiliminal.com / 5gcx.ai / vimy.ai once a month. Each site's
+# rows in `portfolio_chunks` are wiped and reinserted idempotently; nothing
+# else in the pipeline breaks while this runs.
+#
+# Install:
+#   sudo cp jfb-portfolio.service /etc/systemd/system/
+#   sudo cp jfb-portfolio.timer   /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now jfb-portfolio.timer
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# /etc/systemd/system/jfb-portfolio.service
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# [Unit]
+# Description=Job Finder Bot — monthly portfolio-site crawl
+# After=network-online.target ollama.service
+# Wants=network-online.target
+#
+# [Service]
+# Type=oneshot
+# User=YOUR_USER
+# WorkingDirectory=/home/YOUR_USER/job-finder-bot
+# Environment=PATH=/home/YOUR_USER/.local/bin:/usr/local/bin:/usr/bin
+# EnvironmentFile=/home/YOUR_USER/job-finder-bot/.env
+# ExecStart=/home/YOUR_USER/.local/bin/uv run jfb portfolio crawl-all
+# # Re-run the aggregate profile vector after sites finish; tiny cost.
+# ExecStartPost=/home/YOUR_USER/.local/bin/uv run jfb profile ingest
+# StandardOutput=journal
+# StandardError=journal
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# /etc/systemd/system/jfb-portfolio.timer
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# [Unit]
+# Description=Refresh portfolio-site chunks once a month
+#
+# [Timer]
+# OnCalendar=monthly          # first day of each month, 00:00 local
+# RandomizedDelaySec=1h       # don't hammer my own sites on the hour
+# Persistent=true
+#
+# [Install]
+# WantedBy=timers.target

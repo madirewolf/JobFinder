@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}companies · jfb{% endblock %}
+{% block main_class %}wide{% endblock %}
+{% block body %}
+
+<h1>Companies</h1>
+<p class="page-sub">Seeded targets. Live posting counts and average fit score per company.</p>
+
+<div class="card" style="padding: 0; overflow: hidden">
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 60px">Tier</th>
+        <th>Name</th>
+        <th>ATS</th>
+        <th>BG check</th>
+        <th>HQ</th>
+        <th class="num">Live</th>
+        <th class="num">Avg fit</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+        <tr>
+          <td>
+            {% if r.tier %}
+              <span class="tier" data-t="{{ r.tier }}">T{{ r.tier }}</span>
+            {% else %}
+              <span class="muted-2">—</span>
+            {% endif %}
+          </td>
+          <td><strong style="color: var(--ink-dim); font-weight: 600">{{ r.name }}</strong></td>
+          <td class="muted mono" style="font-size: 12px">{{ r.ats or '—' }}</td>
+          <td><span class="pill {{ r.bg_stringency or 'unknown' }}">{{ r.bg_stringency or 'unknown' }}</span></td>
+          <td class="muted">
+            {{ r.hq_city or '—' }}{% if r.hq_province %}, {{ r.hq_province }}{% endif %}
+          </td>
+          <td class="num mono-num">
+            {% if r.live_postings and r.live_postings > 0 %}
+              <strong style="color: var(--ink-dim)">{{ r.live_postings }}</strong>
+            {% else %}
+              <span class="muted-2">0</span>
+            {% endif %}
+          </td>
+          <td class="num mono-num">
+            {% if r.avg_fit is not none %}
+              {{ "%.2f"|format(r.avg_fit) }}
+            {% else %}
+              <span class="muted-2">—</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7" class="muted">No companies seeded yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

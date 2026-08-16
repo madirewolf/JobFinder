@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}top picks · jfb{% endblock %}
+{% block main_class %}wide{% endblock %}
+{% block body %}
+
+<h1>Top picks</h1>
+<p class="page-sub">
+  Highest final-rank postings across all sources. Click <strong>Queue for draft</strong> to send a posting through the bot — the bot never drafts without an explicit click.
+  <br>
+  {{ rows|length }} shown
+  <span class="muted-2"> · </span>
+  {{ n_queued }} queued
+  <span class="muted-2"> · </span>
+  {{ n_review }} ready for review
+  <span class="muted-2"> · </span>
+  {{ n_applied }} applied
+  <br>
+  <span class="muted-2">show:</span>
+  <a href="/top?limit=50{% if show_dismissed %}&show_dismissed=1{% endif %}">50</a>
+  <span class="muted-2">·</span>
+  <a href="/top?limit=200{% if show_dismissed %}&show_dismissed=1{% endif %}">200</a>
+  <span class="muted-2">·</span>
+  <a href="/top?limit=500{% if show_dismissed %}&show_dismissed=1{% endif %}">500</a>
+  <span class="muted-2">·</span>
+  <a href="/top?limit=1000{% if show_dismissed %}&show_dismissed=1{% endif %}">all</a>
+  <span class="muted-2"> · </span>
+  {% if show_dismissed %}
+    <a href="/top">hide dismissed</a>
+  {% else %}
+    <a href="/top?show_dismissed=1">show dismissed</a>
+  {% endif %}
+</p>
+
+{% if n_queued > 0 %}
+  <div class="banner info" style="margin-bottom: 16px">
+    <span class="icon">📝</span>
+    <div class="banner-stack">
+      <strong>{{ n_queued }} posting(s) queued for drafting</strong>
+      <span class="reason">
+        Each runs through a Haiku fit-gate (~$0.01) first; only postings that pass trigger the Sonnet curation call (~$0.05). Bad fits get terminally skipped at the gate.
+        Estimated max spend: <strong>${{ "%.2f"|format(n_queued * 0.06) }}</strong> if every queued posting passes the gate.
+      </span>
+      <a href="/run/draft" style="margin-top: 6px"><button>Generate drafts now →</button></a>
+    </div>
+  </div>
+{% endif %}
+
+<style>
+  tr.clickable { cursor: pointer; }
+  tr.clickable a { color: var(--ink); font-weight: 500; }
+  tr.clickable:hover a { color: var(--accent); }
+  /* page-local: tighten the inline queue form so it fits in the row */
+  form.inline-queue { display: inline-flex; gap: 4px; margin: 0; align-items: center; }
+  form.inline-queue button { padding: 4px 8px; font-size: 11px; }
+  form.inline-queue button.mode-tailor { background: var(--panel-2); color: var(--accent); border: 1px solid var(--accent-dim); }
+  form.inline-queue button.mode-tailor:hover { background: var(--accent); color: #081420; }
+  form.inline-queue button.mode-curate { background: var(--panel-2); color: var(--good); border: 1px solid #1e4833; }
+  form.inline-queue button.mode-curate:hover { background: var(--good); color: #081420; }
+</style>
+
+<div class="card" style="padding: 0; overflow: hidden">
+  <table>
+    <thead>
+      <tr>
+        <th class="num" style="width: 40px">#</th>
+        <th class="num" style="width: 80px">Rank</th>
+        <th>Title</th>
+        <th>Company</th>
+        <th>Location</th>
+        <th>BG</th>
+        <th>Status / Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+        {% set bg = r.bg_stringency or 'unknown' %}
+        <tr class="clickable" onclick="if(event.target.closest('a,button,form')==null) window.location='/posting/{{ r.posting_id }}'">
+          <td class="num muted-2 mono-num">{{ loop.index }}</td>
+          <td class="num mono-num">
+            <strong style="color: var(--accent)">{{ "%.2f"|format(r.final_rank or 0) }}</strong>
+          </td>
+          <td>
+            <a href="/posting/{{ r.posting_id }}">{{ r.title | truncate(80) }}</a>
+          </td>
+          <td>
+            <strong style="color: var(--ink-dim); font-weight: 500">{{ r.company }}</strong>
+            {% if r.tier %}
+              <span class="tier" data-t="{{ r.tier }}" style="font-size: 10px; margin-left: 4px">T{{ r.tier }}</span>
+            {% endif %}
+          </td>
+          <td class="muted">
+            {% if r.hq_city %}{{ r.hq_city }}{% else %}—{% endif %}
+            {% if r.remote_type and r.remote_type != 'onsite' %}
+              <span class="muted-2">· {{ r.remote_type }}</span>
+            {% endif %}
+          </td>
+          <td>
+            <span class="pill {{ bg }} bg-warn" title="{% if bg in ('strict','very_strict') %}Strict — apply with eyes open{% elif bg == 'moderate' %}Moderate{% elif bg == 'unknown' %}Stringency unknown — treat as moderate{% else %}Lenient{% endif %}">
+              {% if bg in ('strict','very_strict') %}<span class="icon">⚠</span>{% elif bg == 'moderate' or bg == 'unknown' %}<span class="icon">!</span>{% endif %}
+              {{ bg }}
+            </span>
+          </td>
+          <td>
+            {% if r.applied_at %}
+              <span class="status-chip applied">applied</span>
+            {% elif r.application_status == 'dismissed' %}
+              <span class="status-chip" style="background: var(--panel-2); color: var(--muted)" title="manually dismissed">dismissed</span>
+              <form method="post" action="/posting/{{ r.posting_id }}/undismiss" style="display: inline; margin: 0">
+                <input type="hidden" name="next_url" value="/top{% if show_dismissed %}?show_dismissed=1{% endif %}">
+                <button type="submit" class="ghost small" title="Move back to top picks">↺ undo</button>
+              </form>
+            {% elif r.application_status == 'ready_for_human' or r.application_status == 'drafted' %}
+              <a href="/posting/{{ r.posting_id }}" class="status-chip ready_for_human">review draft</a>
+              {% if r.draft_mode %}<span class="mode-pill-inline {{ r.draft_mode }}" title="drafted in {{ r.draft_mode }} mode">{{ r.draft_mode }}</span>{% endif %}
+            {% elif r.application_status == 'queued' %}
+              <span class="status-chip queued">queued</span>
+              {% if r.draft_mode %}<span class="mode-pill-inline {{ r.draft_mode }}" title="will be drafted in {{ r.draft_mode }} mode">{{ r.draft_mode }}</span>{% endif %}
+            {% elif r.application_status %}
+              <span class="status-chip">{{ r.application_status }}</span>
+            {% else %}
+              <form method="post" action="/posting/{{ r.posting_id }}/queue" class="inline-queue" title="Queue for the bot to draft. Tailor = paraphrase to match posting; Curate = selection-only (master verbatim).">
+                <input type="hidden" name="next_url" value="/top">
+                {% if draft_mode_default == 'curate' %}
+                  <button type="submit" name="mode" value="curate" class="mode-curate small">Queue (curate)</button>
+                  <button type="submit" name="mode" value="tailor" class="mode-tailor small ghost">tailor</button>
+                {% else %}
+                  <button type="submit" name="mode" value="tailor" class="mode-tailor small">Queue (tailor)</button>
+                  <button type="submit" name="mode" value="curate" class="mode-curate small ghost">curate</button>
+                {% endif %}
+              </form>
+              <form method="post" action="/posting/{{ r.posting_id }}/dismiss" style="display: inline; margin: 0 0 0 4px"
+                    onsubmit="return confirm('Dismiss this posting? It will be hidden from /top until you un-dismiss it.');">
+                <input type="hidden" name="next_url" value="/top">
+                <button type="submit" class="ghost small" title="Hide this posting from /top">✕</button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr>
+          <td colspan="7" class="muted">
+            No ranked postings yet. Run <code>jfb ingest run</code> then <code>jfb classify rank</code>.
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

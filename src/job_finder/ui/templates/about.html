@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+{% block title %}about · jfb{% endblock %}
+{% block main_class %}narrow{% endblock %}
+{% block body %}
+
+<style>
+  .lifecycle {
+    background: var(--panel-2);
+    color: var(--ink-dim);
+    font-family: ui-monospace, SFMono-Regular, "Cascadia Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    padding: 16px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    overflow-x: auto;
+    white-space: pre;
+    margin: 0 0 14px 0;
+  }
+  .step {
+    display: flex; gap: 14px; align-items: flex-start;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .step:last-child { border-bottom: 0; }
+  .step .num {
+    flex: 0 0 28px; height: 28px; border-radius: 50%;
+    background: var(--panel-2); color: var(--accent);
+    font-weight: 700; font-size: 12px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid var(--border-strong);
+    font-variant-numeric: tabular-nums;
+  }
+  .step.cost .num {
+    background: #33260e; color: var(--warn); border-color: #4a3717;
+  }
+  .step .body { flex: 1; min-width: 0; }
+  .step h3 { margin: 2px 0 4px; }
+  .step .step-sub { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+  .step pre {
+    background: #0a0d12; color: var(--ink-dim);
+    padding: 10px 12px; border-radius: var(--radius-sm);
+    font-size: 12px; line-height: 1.5;
+    overflow-x: auto; margin: 6px 0;
+    border: 1px solid var(--border);
+  }
+  .cost-tag {
+    display: inline-block; padding: 1px 8px; border-radius: 999px;
+    font-size: 10px; font-weight: 500; letter-spacing: 0.04em;
+    text-transform: uppercase; vertical-align: middle; margin-left: 4px;
+  }
+  .cost-tag.free { background: #11291c; color: var(--good); border: 1px solid #1e4833; }
+  .cost-tag.paid { background: #33260e; color: var(--warn); border: 1px solid #4a3717; }
+  table.rules { margin-top: 10px; }
+  table.rules td { vertical-align: top; padding: 8px 12px; }
+  table.rules td:first-child { color: var(--muted); width: 38%; }
+</style>
+
+<h1>How to use this</h1>
+<p class="page-sub">
+  The bot drafts; you submit. Two human-in-the-loop gates between a posting and an actual application — queue (free) and apply (free). Money only flows when <em>you type</em> a CLI command.
+</p>
+
+<!-- ── Lifecycle diagram ─────────────────────────────────────────────── -->
+<h2>Lifecycle</h2>
+<pre class="lifecycle">
+   ┌─────────────┐                                      ┌──────────┐
+   │  ingest     │  free                                │  apply   │  free
+   │  classify   │  $0.01/posting (haiku once per row)  │  on the  │
+   │             │                                      │  ATS     │
+   └──────┬──────┘                                      └────▲─────┘
+          │                                                  │
+          ▼                                                  │
+   ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    │
+   │   /top      │ ──▶│   queue     │───▶│  draft top  │────┘
+   │   (browse)  │free│  (your     │ $0  │  (Sonnet)   │
+   │             │    │  click)    │     │~$0.04/post  │
+   └─────────────┘    └─────────────┘    └─────────────┘
+                       Gate 1                Gate 2 (you mark applied)
+</pre>
+
+<!-- ── Step-by-step ──────────────────────────────────────────────────── -->
+<h2>Step by step</h2>
+
+<div class="card">
+
+  <div class="step">
+    <span class="num">1</span>
+    <div class="body">
+      <h3>Pull new postings <span class="cost-tag free">FREE</span></h3>
+      <div class="step-sub">~weekly. Hits every seeded ATS source (Greenhouse, Lever, Ashby, Workday, etc.). Nothing here calls Anthropic.</div>
+<pre>jfb ingest all</pre>
+    </div>
+  </div>
+
+  <div class="step cost">
+    <span class="num">2</span>
+    <div class="body">
+      <h3>Score the new postings <span class="cost-tag paid">~$0.01/posting</span></h3>
+      <div class="step-sub">Four sub-steps. Only the <strong>haiku</strong> step bills Anthropic; the rest are local (regex + Ollama + cosine math).</div>
+<pre>jfb classify run         <span class="muted-2"># regex pass        — free</span>
+jfb classify embed       <span class="muted-2"># Ollama embeddings — free</span>
+jfb classify haiku       <span class="muted-2"># ★ ~$0.01/posting</span>
+jfb classify rank        <span class="muted-2"># cosine ranking    — free</span>
+
+<span class="muted-2"># Or chain all four:</span>
+jfb classify all</pre>
+      <div class="step-sub" style="margin-top: 8px">
+        Haiku is only run on rows that don't yet have a fit_score, so re-running is cheap once steady-state.
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="num">3</span>
+    <div class="body">
+      <h3>Browse + queue <span class="cost-tag free">FREE</span></h3>
+      <div class="step-sub">
+        Open <a href="/top">/top</a> and scan by <strong>final_rank</strong>. Click <span class="status-chip queued">Queue (curate)</span> on anything worth drafting. Each click inserts an applications row at <code>status='queued'</code> — nothing else.
+      </div>
+<pre>jfb web serve --port 8000
+<span class="muted-2"># open http://localhost:8000/top</span></pre>
+      <div class="step-sub" style="margin-top: 8px">
+        Mode tip:
+        <span class="mode-pill-inline curate">curate</span> never rewrites your master — model only selects projects + pulls verbatim quotes.
+        <span class="mode-pill-inline tailor">tailor</span> paraphrases your bullets to match the posting (higher keyword match, higher fabrication risk).
+        Default is curate.
+      </div>
+    </div>
+  </div>
+
+  <div class="step cost">
+    <span class="num">4</span>
+    <div class="body">
+      <h3>Generate drafts <span class="cost-tag paid">~$0.04/draft</span></h3>
+      <div class="step-sub">
+        The drafter only acts on rows you queued. <strong>Cache tip:</strong> batch by mode — the cached system prefix differs between curate and tailor, so alternating per posting pays full price every call.
+      </div>
+<pre>jfb draft top --mode curate --limit 5
+<span class="muted-2"># ~$0.10 first call + ~$0.03 × 4 cache-hits ≈ ~$0.22 for 5 drafts</span>
+
+jfb draft top --mode tailor --limit 5
+<span class="muted-2"># or just one posting:</span>
+jfb draft one --posting-id 533 --mode curate</pre>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="num">5</span>
+    <div class="body">
+      <h3>Review drafts <span class="cost-tag free">FREE</span></h3>
+      <div class="step-sub">
+        Each queued posting now reads <span class="status-chip ready_for_human">review draft</span>. Open it, read the cover letter, emphasis quotes, talking points, red flags. <strong>Copy</strong> the bits you want; the bot never submits anything externally.
+      </div>
+      <div class="step-sub">
+        If a draft is bad, re-queue it (resets <code>status='queued'</code>) and re-run <code>jfb draft top</code> — within five minutes the cache is still warm, so re-drafts are cheap.
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="num">6</span>
+    <div class="body">
+      <h3>Mark as applied <span class="cost-tag free">FREE</span></h3>
+      <div class="step-sub">
+        After you've actually submitted on the company's site, click <strong>Mark as applied</strong> on the posting page. That's the only thing that stamps <code>applied_at</code>. The bot will not assume.
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Daily-driver loop ─────────────────────────────────────────────── -->
+<h2>Daily-driver loop</h2>
+<div class="card">
+<pre style="margin: 0; background: transparent; padding: 0; border: 0">jfb ingest all && jfb classify all      <span class="muted-2"># morning refresh + score (~$0.10–0.50)</span>
+jfb web serve --port 8000               <span class="muted-2"># browse, queue 5–10</span>
+jfb draft top --mode curate --limit 10  <span class="muted-2"># ~$0.20–0.40 in drafts</span>
+<span class="muted-2"># review → submit externally → "Mark as applied"</span></pre>
+</div>
+
+<!-- ── Tailor vs. curate ─────────────────────────────────────────────── -->
+<h2>Tailor vs. curate</h2>
+<div class="card" style="padding: 0; overflow: hidden">
+  <table>
+    <thead>
+      <tr>
+        <th></th>
+        <th><span class="mode-pill-inline tailor">tailor</span></th>
+        <th><span class="mode-pill-inline curate">curate</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="muted">What the model writes</td>
+        <td>3–6 fresh "tailored bullets" paraphrased from your master</td>
+        <td>Just selects which projects to include; pulls VERBATIM quotes from your master</td>
+      </tr>
+      <tr>
+        <td class="muted">Fabrication risk</td>
+        <td><span class="warn">non-zero</span> — model may round numbers or invent specifics</td>
+        <td><span class="good">very low</span> — quote-verifier checks every emphasis quote post-hoc</td>
+      </tr>
+      <tr>
+        <td class="muted">Keyword match per posting</td>
+        <td>Highest (intentional paraphrase)</td>
+        <td>Limited to what your master already says</td>
+      </tr>
+      <tr>
+        <td class="muted">Cover letter, talking points, red flags</td>
+        <td>LLM-written (both modes)</td>
+        <td>LLM-written (both modes)</td>
+      </tr>
+      <tr>
+        <td class="muted">Best for</td>
+        <td>Postings where keyword density really matters and you'll review every word</td>
+        <td>Default. Defence-adjacent or any role where truthfulness is high-stakes.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ── Rules of thumb ────────────────────────────────────────────────── -->
+<h2>Rules of thumb</h2>
+<div class="card">
+  <table class="rules">
+    <tbody>
+      <tr><td>How often to run <code>ingest all</code>?</td><td>Daily or weekly — free.</td></tr>
+      <tr><td>How often to run <code>classify haiku</code>?</td><td>Whenever new postings are pending (~$0.01 each).</td></tr>
+      <tr><td>How often to run <code>draft top</code>?</td><td>When you've queued 3–10 things and want them drafted at once (cache savings).</td></tr>
+      <tr><td>Do I have to use both modes?</td><td>No. Pick <span class="mode-pill-inline curate">curate</span> and stick with it; tailor is the escape hatch.</td></tr>
+      <tr><td>What if a draft sucks?</td><td>Re-queue (<code>status='queued'</code>) and re-run <code>jfb draft top</code> — cache hit within 5 min.</td></tr>
+      <tr><td>Cap on daily spend?</td><td>None enforced. Soft ceiling of 5/day is documented in <code>profile/prefs.md</code>.</td></tr>
+      <tr><td>Active days expected cost?</td><td>~$0.30–$1.00 / day. Idle days: <strong>$0</strong>.</td></tr>
+      <tr><td>Does the UI ever cost money?</td><td><strong>No.</strong> Browsing and clicking buttons (queue, mark applied, mode toggle) are all free. Only CLI <code>jfb classify haiku</code> and <code>jfb draft *</code> bill Anthropic.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ── BG-check warn semantics ───────────────────────────────────────── -->
+<h2>Background-check warnings</h2>
+<div class="card">
+  <p style="margin-bottom: 8px">
+    Per <code>profile/prefs.md</code>, the bot <strong>warns</strong> on background-check stringency rather than filtering. Postings always appear in <a href="/top">/top</a>; you decide whether to queue them.
+  </p>
+  <ul class="bullets">
+    <li><span class="pill lenient">lenient</span> — apply normally, no warning.</li>
+    <li><span class="pill moderate">moderate</span> — yellow chip + reason ("standard reference / employment verification expected").</li>
+    <li><span class="pill strict">strict</span> — red chip + explicit reason banner on the posting page.</li>
+    <li><span class="pill unknown">unknown</span> — yellow chip; treated as moderate.</li>
+  </ul>
+</div>
+
+{% endblock %}

@@ -1,0 +1,56 @@
+# secrets - never commit
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+secrets.json
+credentials.json
+
+# os / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# local run artifacts (may contain scraped JD html)
+artifacts/
+logs/
+*.db
+*.sqlite3
+profile/prefs.md
+profile/resume.md
+
+# --- pre-existing ---
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+.pytest_cache/
+.ruff_cache/
+.pyright/
+dist/
+build/
+*.egg-info/
+artifacts/
+resumes/
+*.pdf
+.DS_Store
+.coverage
+htmlcov/
+
+# personal profile corpus - this is USER DATA, not part of the tool.
+# Contains employer/client program write-ups (incl. an in-flight DND submission).
+# Ship the .example files only so the structure is documented.
+profile/*
+!profile/README.md
+!profile/*.example.md

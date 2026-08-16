@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{% block title %}Job Finder Bot{% endblock %}</title>
+  <script src="https://unpkg.com/htmx.org@2.0.3" defer></script>
+  <style>
+    :root {
+      --bg: #0f1216;
+      --panel: #141821;
+      --panel-2: #1b2030;
+      --panel-hover: #1a1f2b;
+      --border: #242b3a;
+      --border-strong: #2d3548;
+      --ink: #e6e9ef;
+      --ink-dim: #c4cbd9;
+      --muted: #8893a7;
+      --muted-2: #6a7488;
+      --accent: #7db3ff;
+      --accent-dim: #4e80c4;
+      --warn: #f0b86e;
+      --good: #7cd19b;
+      --bad: #f08585;
+      --radius: 8px;
+      --radius-sm: 5px;
+      --content-narrow: 860px;
+      --content-wide: 1320px;
+      --gutter: 20px;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { color-scheme: dark; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 14px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: var(--ink); text-decoration: underline; }
+    code, pre, .mono {
+      font-family: ui-monospace, SFMono-Regular, "Cascadia Mono", Menlo, Consolas, monospace;
+    }
+    hr { border: 0; border-top: 1px solid var(--border); margin: 20px 0; }
+
+    /* ── Navigation ──────────────────────────────────────────────────── */
+    nav.topbar {
+      padding: 10px 20px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      display: flex; gap: 4px; align-items: center;
+      position: sticky; top: 0; z-index: 10;
+    }
+    nav.topbar .brand {
+      font-weight: 700; letter-spacing: 0.02em; color: var(--ink);
+      margin-right: 16px;
+    }
+    nav.topbar a.nav-link {
+      color: var(--muted); text-decoration: none; font-weight: 500;
+      padding: 6px 12px; border-radius: var(--radius-sm);
+    }
+    nav.topbar a.nav-link:hover { color: var(--ink); background: var(--panel-2); }
+    nav.topbar a.nav-link.active {
+      color: var(--accent); background: var(--panel-2);
+    }
+    nav.topbar .spacer { flex: 1; }
+    nav.topbar .badge {
+      font-size: 11px; padding: 3px 10px; background: var(--panel-2);
+      border-radius: 999px; color: var(--muted); border: 1px solid var(--border);
+    }
+
+    /* ── Layout containers ──────────────────────────────────────────── */
+    main { padding: 24px 20px 60px; margin: 0 auto; }
+    main.narrow { max-width: var(--content-narrow); }
+    main.wide   { max-width: var(--content-wide); }
+
+    /* ── Typography ─────────────────────────────────────────────────── */
+    h1 { font-size: 22px; margin: 0 0 6px 0; letter-spacing: -0.01em; }
+    h2 {
+      font-size: 12px; margin: 20px 0 8px 0;
+      color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em;
+      font-weight: 600;
+    }
+    h3 { font-size: 15px; margin: 0 0 6px 0; font-weight: 600; }
+    p  { margin: 0 0 12px 0; }
+    .muted    { color: var(--muted); }
+    .muted-2  { color: var(--muted-2); }
+    .danger   { color: var(--bad); }
+    .good     { color: var(--good); }
+    .warn     { color: var(--warn); }
+    .mono-num { font-variant-numeric: tabular-nums; }
+    .page-sub { color: var(--muted); margin-top: -2px; margin-bottom: 20px; }
+
+    /* ── Cards ──────────────────────────────────────────────────────── */
+    .card {
+      background: var(--panel);
+      padding: 14px 16px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      margin-bottom: 12px;
+    }
+    .card.compact { padding: 10px 12px; }
+    .card-head {
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: 12px; margin-bottom: 10px;
+    }
+    .card-head h3 { margin: 0; }
+
+    /* ── Pills (bg stringency, tiers, status) ───────────────────────── */
+    .pill {
+      display: inline-block; padding: 2px 9px; border-radius: 999px;
+      font-size: 11px; font-weight: 500; letter-spacing: 0.02em;
+      border: 1px solid transparent;
+    }
+    .pill.lenient      { background: #153124; color: var(--good); border-color: #1e4833; }
+    .pill.moderate     { background: #33260e; color: var(--warn); border-color: #4a3717; }
+    .pill.strict,
+    .pill.very_strict  { background: #3a1c1c; color: var(--bad);  border-color: #562626; }
+    .pill.unknown      { background: var(--panel-2); color: var(--muted); border-color: var(--border); }
+
+    .tier { font-weight: 600; font-variant-numeric: tabular-nums; }
+    .tier.t1, .tier[data-t="1"] { color: var(--good); }
+    .tier.t2, .tier[data-t="2"] { color: var(--accent); }
+    .tier.t3, .tier[data-t="3"] { color: var(--muted); }
+
+    /* ── Tables ─────────────────────────────────────────────────────── */
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+    th {
+      color: var(--muted); font-weight: 500; font-size: 11px;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      border-bottom-color: var(--border-strong);
+    }
+    tbody tr:hover td { background: var(--panel-hover); }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* ── Buttons ────────────────────────────────────────────────────── */
+    button, .btn {
+      background: var(--accent); color: #081420; border: 0;
+      padding: 9px 16px; border-radius: var(--radius-sm);
+      cursor: pointer; font-weight: 600; font-size: 13px; line-height: 1;
+      display: inline-flex; align-items: center; gap: 6px;
+      transition: background 80ms ease;
+    }
+    button:hover, .btn:hover { background: #9ac5ff; }
+    button.ghost, .btn.ghost {
+      background: transparent; color: var(--ink-dim);
+      border: 1px solid var(--border-strong);
+    }
+    button.ghost:hover, .btn.ghost:hover { background: var(--panel-2); color: var(--ink); }
+    button.small, .btn.small { padding: 5px 10px; font-size: 11px; }
+    button.primary-lg, .btn.primary-lg { padding: 11px 20px; font-size: 14px; }
+
+    /* ── Form controls ──────────────────────────────────────────────── */
+    textarea, input[type="text"], select {
+      width: 100%; background: var(--panel-2); color: var(--ink);
+      border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+      padding: 8px 10px; font: inherit; font-size: 13px;
+    }
+    textarea:focus, input:focus, select:focus {
+      outline: none; border-color: var(--accent-dim);
+    }
+    label { color: var(--muted); font-size: 12px; display: block; margin-bottom: 4px; }
+
+    /* ── Prose (cover letter, description) ──────────────────────────── */
+    .prose {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      line-height: 1.65;
+      font-size: 14px;
+      color: var(--ink-dim);
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      border: 0;
+    }
+    .bullets { padding-left: 20px; margin: 0; }
+    .bullets li { margin-bottom: 6px; color: var(--ink-dim); line-height: 1.55; }
+    .bullets li .section-tag {
+      color: var(--muted-2); font-size: 11px; text-transform: uppercase;
+      letter-spacing: 0.05em; margin-right: 6px;
+    }
+
+    /* ── Definition list (metadata rows) ────────────────────────────── */
+    dl.kv { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 0; }
+    dl.kv dt { color: var(--muted); font-size: 12px; }
+    dl.kv dd { margin: 0; font-variant-numeric: tabular-nums; }
+
+    /* ── Banners ────────────────────────────────────────────────────── */
+    .banner {
+      padding: 12px 16px; border-radius: var(--radius);
+      border: 1px solid var(--border); margin-bottom: 16px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .banner.applied { background: #11291c; border-color: #1e4833; color: var(--good); }
+    .banner.warn    { background: #33260e; border-color: #4a3717; color: var(--warn); }
+    .banner.danger  { background: #3a1c1c; border-color: #562626; color: var(--bad); }
+    .banner.info    { background: #112334; border-color: #1f3856; color: var(--accent); }
+    .banner.queued  { background: #1c2438; border-color: #2a3958; color: var(--accent); }
+    .banner strong { color: inherit; }
+    .banner .icon { font-size: 16px; line-height: 1; }
+    .banner-stack { display: flex; flex-direction: column; gap: 0; flex: 1; }
+    .banner-stack .reason { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+    /* ── BG-check warn surfacing (warn, don't filter — see prefs.md) ── */
+    .bg-warn { display: inline-flex; align-items: center; gap: 4px; }
+    .bg-warn .icon { font-size: 11px; }
+
+    /* ── App-status chip (queued / drafted / ready / applied) ───────── */
+    .status-chip {
+      display: inline-block; padding: 2px 9px; border-radius: 999px;
+      font-size: 10px; font-weight: 500; letter-spacing: 0.04em;
+      text-transform: uppercase;
+      background: var(--panel-2); color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .status-chip.queued          { background: #1c2438; color: var(--accent); border-color: #2a3958; }
+    .status-chip.drafted,
+    .status-chip.ready_for_human { background: #1b2a3a; color: var(--accent); border-color: #2a4258; }
+    .status-chip.applied         { background: #11291c; color: var(--good);   border-color: #1e4833; }
+    .status-chip.rejected        { background: #3a1c1c; color: var(--bad);    border-color: #562626; }
+
+    /* ── Mode pill (tailor / curate) — small inline marker ──────── */
+    .mode-pill-inline {
+      display: inline-block; padding: 1px 7px; border-radius: 999px;
+      font-size: 10px; font-weight: 500; letter-spacing: 0.04em;
+      text-transform: uppercase; border: 1px solid transparent;
+      vertical-align: middle; margin-left: 4px;
+    }
+    .mode-pill-inline.tailor { background: #1b2a3a; color: var(--accent); border-color: #2a4258; }
+    .mode-pill-inline.curate { background: #11291c; color: var(--good);   border-color: #1e4833; }
+    .mode-pill-inline.preset { background: #2a2440; color: #b9a7f0;        border-color: #443a66; }
+
+    /* ── Copy helper ────────────────────────────────────────────────── */
+    .copy-slot { position: relative; }
+    .copy-slot .copy-btn {
+      position: absolute; top: 8px; right: 8px; z-index: 1;
+    }
+
+    /* ── Toast ──────────────────────────────────────────────────────── */
+    #toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(40px);
+      background: var(--panel-2); color: var(--ink); padding: 10px 18px;
+      border-radius: 999px; border: 1px solid var(--border-strong);
+      font-size: 13px; opacity: 0; transition: opacity 160ms, transform 160ms;
+      pointer-events: none; z-index: 100;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── Responsive ─────────────────────────────────────────────────── */
+    @media (max-width: 720px) {
+      nav.topbar { padding: 8px 12px; flex-wrap: wrap; }
+      main { padding: 16px 12px 40px; }
+      .hide-narrow { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="topbar">
+    <span class="brand">jfb</span>
+    <a class="nav-link {% if current == 'home' %}active{% endif %}" href="/">home</a>
+    <a class="nav-link {% if current == 'run' %}active{% endif %}" href="/run">run</a>
+    <a class="nav-link {% if current == 'top' %}active{% endif %}" href="/top">top picks</a>
+    <a class="nav-link {% if current == 'kanban' %}active{% endif %}" href="/kanban">kanban</a>
+    <a class="nav-link {% if current == 'companies' %}active{% endif %}" href="/companies">companies</a>
+    <a class="nav-link {% if current == 'metrics' %}active{% endif %}" href="/metrics">metrics</a>
+    <a class="nav-link {% if current == 'about' %}active{% endif %}" href="/about">how to use</a>
+    <span class="spacer"></span>
+    <span class="badge hide-narrow">bot drafts · human submits</span>
+  </nav>
+
+  <main class="{% block main_class %}wide{% endblock %}">
+    {% block body %}{% endblock %}
+  </main>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    // Copy-to-clipboard helper. data-copy-target="#selector" copies that element's
+    // textContent; without it, copies the element's own textContent.
+    (function () {
+      function toast(msg) {
+        var el = document.getElementById("toast");
+        if (!el) return;
+        el.textContent = msg;
+        el.classList.add("show");
+        clearTimeout(el._t);
+        el._t = setTimeout(function () { el.classList.remove("show"); }, 1400);
+      }
+      async function copyText(txt) {
+        try {
+          await navigator.clipboard.writeText(txt);
+          toast("Copied to clipboard");
+        } catch (e) {
+          // Fallback for insecure contexts
+          var ta = document.createElement("textarea");
+          ta.value = txt; document.body.appendChild(ta); ta.select();
+          try { document.execCommand("copy"); toast("Copied"); }
+          catch (err) { toast("Copy failed"); }
+          document.body.removeChild(ta);
+        }
+      }
+      document.addEventListener("click", function (e) {
+        var btn = e.target.closest("[data-copy]");
+        if (!btn) return;
+        e.preventDefault();
+        var sel = btn.getAttribute("data-copy-target");
+        var src = sel ? document.querySelector(sel) : btn;
+        if (!src) return;
+        var text = src.getAttribute("data-copy-text") || src.textContent || "";
+        copyText(text.trim());
+      });
+    })();
+  </script>
+</body>
+</html>
